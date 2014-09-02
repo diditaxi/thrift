@@ -20,6 +20,7 @@
 *.swp
 *.hi
 *~
+*tags
 
 .*project
 junit*.properties
