@@ -18,12 +18,13 @@
 #
 
 AC_PREREQ(2.65)
+AC_CONFIG_MACRO_DIR([./aclocal])
 
 AC_INIT([thrift], [1.0.0-dev])
 
 AC_CONFIG_AUX_DIR([.])
 
-AM_INIT_AUTOMAKE([1.11 tar-ustar])
+AM_INIT_AUTOMAKE([1.13 tar-ustar])
 PKG_PROG_PKG_CONFIG
 
 AC_ARG_VAR([PY_PREFIX], [Prefix for installing Python modules.
@@ -100,6 +101,9 @@ AC_PROG_RANLIB
 AC_LANG([C++])
 AX_CXX_COMPILE_STDCXX_11([noext])
 
+AM_EXTRA_RECURSIVE_TARGETS([style])
+AC_SUBST(CPPSTYLE_CMD, 'find . -type f \( -iname "*.h" -or -iname "*.cpp" -or -iname "*.cc" -or -iname "*.tcc" \) -printf "Reformatting: %h/%f\n" -exec clang-format -i {} \;')
+
 AC_ARG_ENABLE([libs],
   AS_HELP_STRING([--enable-libs], [build the Apache Thrift libraries [default=yes]]),
   [], enable_libs=yes
@@ -114,6 +118,7 @@ if test "$enable_libs" = "no"; then
   with_python="no"
   with_ruby="no"
   with_haskell="no"
+  with_haxe="no"
   with_perl="no"
   with_php="no"
   with_php_extension="no"
@@ -128,10 +133,14 @@ fi
 AX_THRIFT_LIB(cpp, [C++], yes)
 have_cpp=no
 if test "$with_cpp" = "yes";  then
-  AX_BOOST_BASE([1.54.0])
+  AX_BOOST_BASE([1.53.0])
   if test "x$succeeded" = "xyes" ; then
+    AC_SUBST([BOOST_LIB_DIR], [$(echo "$BOOST_LDFLAGS" | sed -e 's/^\-L//')])
+    AC_SUBST([BOOST_TEST_LDADD], [$(echo "$BOOST_LIB_DIR/libboost_unit_test_framework.a")])
     have_cpp="yes"
   fi
+
+  AX_CHECK_OPENSSL()
 
   AX_LIB_EVENT([1.0])
   have_libevent=$success
@@ -145,14 +154,33 @@ if test "$with_cpp" = "yes";  then
     PKG_CHECK_MODULES([QT], [QtCore >= 4.3, QtNetwork >= 4.3], have_qt=yes, have_qt=no)
   fi
   if test "$have_qt" = "yes"; then
-    AC_PATH_PROGS([QT_MOC], [moc-qt4 moc])
-    have_qt=$success
+    AC_PATH_PROGS([QT_MOC], [moc-qt4 moc], "fail")
+    if test "$QT_MOC" = "fail"; then
+      have_qt=no
+    fi
+  fi
+
+  AX_THRIFT_LIB(qt5, [Qt5], yes)
+  have_qt5=no
+  qt_reduce_reloc=""
+  if test "$with_qt5" = "yes";  then
+    PKG_CHECK_MODULES([QT5], [Qt5Core >= 5.0, Qt5Network >= 5.0],
+                      [have_qt5=yes;qt_reduce_reloc=`$PKG_CONFIG --variable=qt_config Qt5Core | grep "reduce_relocations"`],
+                      [have_qt5=no])
+  fi
+  if test "$have_qt5" = "yes"; then
+    AC_PATH_PROGS([QT5_MOC], [moc-qt5 moc], "fail")
+    if test "$QT5_MOC" = "fail"; then
+      have_qt5=no
+    fi
   fi
 fi
 AM_CONDITIONAL([WITH_CPP], [test "$have_cpp" = "yes"])
 AM_CONDITIONAL([AMX_HAVE_LIBEVENT], [test "$have_libevent" = "yes"])
 AM_CONDITIONAL([AMX_HAVE_ZLIB], [test "$have_zlib" = "yes"])
 AM_CONDITIONAL([AMX_HAVE_QT], [test "$have_qt" = "yes"])
+AM_CONDITIONAL([AMX_HAVE_QT5], [test "$have_qt5" = "yes"])
+AM_CONDITIONAL([QT5_REDUCE_RELOCATIONS], [test "x$qt_reduce_reloc" != "x"])
 
 AX_THRIFT_LIB(c_glib, [C (GLib)], yes)
 if test "$with_c_glib" = "yes"; then
@@ -166,6 +194,7 @@ AM_CONDITIONAL(WITH_C_GLIB, [test "$have_glib2" = "yes" -a "$have_gobject2" = "y
 
 AX_THRIFT_LIB(csharp, [C#], yes)
 if test "$with_csharp" = "yes";  then
+  PKG_CHECK_MODULES(MONO, mono >= 3.0.0, net_4_5=yes, net_4_5=no)
   PKG_CHECK_MODULES(MONO, mono >= 2.0.0, net_3_5=yes, net_3_5=no)
   PKG_CHECK_MODULES(MONO, mono >= 1.2.4, have_mono=yes, have_mono=no)
   if test "$have_mono" = "yes" ; then
@@ -174,6 +203,7 @@ if test "$with_csharp" = "yes";  then
 fi
 AM_CONDITIONAL(WITH_MONO, [test "$have_csharp" = "yes"])
 AM_CONDITIONAL(NET_2_0, [test "$net_3_5" = "no"])
+AM_CONDITIONAL(NET_4_5, [test "$net_4_5" = "yes"])
 
 AX_THRIFT_LIB(java, [Java], yes)
 if test "$with_java" = "yes";  then
@@ -182,7 +212,7 @@ if test "$with_java" = "yes";  then
   AX_CHECK_ANT_VERSION($ANT, 1.7)
   AC_SUBST(CLASSPATH)
   AC_SUBST(ANT_FLAGS)
-  if test "x$JAVAC" != "x" && test "x$JAVAC" != "x" && test "x$ANT" != "x" ; then
+  if test "x$JAVA" != "x" && test "x$JAVAC" != "x" && test "x$ANT" != "x" ; then
     have_java="yes"
   fi
 fi
@@ -219,9 +249,10 @@ AM_CONDITIONAL(HAVE_NPM, [test "x$NPM" != "x"])
 AX_THRIFT_LIB(lua, [Lua], yes)
 have_lua=no
 if test "$with_lua" = "yes"; then
-  AC_PATH_PROGS([LUA], [lua])
-  if test "x$LUA" != "x"; then
-    have_lua="yes"
+  AX_PROG_LUA(5.2,, have_lua="yes", have_lua="no")
+  if test "$have_lua" = "yes"; then
+    AX_LUA_HEADERS(, have_lua="no")
+    AX_LUA_LIBS(, have_lua="no")
   fi
 fi
 AM_CONDITIONAL(WITH_LUA, [test "$have_lua" = "yes"])
@@ -312,10 +343,37 @@ AX_THRIFT_LIB(go, [Go], yes)
 if test "$with_go" = "yes";  then
   AC_PATH_PROG([GO], [go])
   if [[ -x "$GO" ]] ; then
-    have_go="yes"
+    AS_IF([test -n "$GO"],[
+      ax_go_version="1.4"
+
+      AC_MSG_CHECKING([for Go version])
+      golang_version=`$GO version 2>&1 | $SED -e 's/\(go \)\(version \)\(go\)\(@<:@0-9@:>@.@<:@0-9@:>@.@<:@0-9@:>@\)\(@<:@\*@:>@*\).*/\4/'`
+      AC_MSG_RESULT($golang_version)
+      AC_SUBST([golang_version],[$golang_version])
+      AX_COMPARE_VERSION([$ax_go_version],[le],[$golang_version],[
+      :
+        have_go="yes"
+      ],[
+      :
+        have_go="no"
+      ])
+    ],[
+      AC_MSG_WARN([could not find Go ])
+      have_go="no"
+    ])
   fi
 fi
 AM_CONDITIONAL(WITH_GO, [test "$have_go" = "yes"])
+
+
+AX_THRIFT_LIB(haxe, [Haxe], yes)
+if test "$with_haxe" = "yes";  then
+  AC_PATH_PROG([HAXE], [haxe])
+  if [[ -x "$HAXE" ]] ; then
+    AX_PROG_HAXE_VERSION( [3.1.3], have_haxe="yes", have_haxe="no")
+  fi
+fi
+AM_CONDITIONAL(WITH_HAXE, [test "$have_haxe" = "yes"])
 
 
 AX_THRIFT_LIB(d, [D], yes)
@@ -540,6 +598,7 @@ AC_CHECK_FUNCS([memset])
 AC_CHECK_FUNCS([mkdir])
 AC_CHECK_FUNCS([realpath])
 AC_CHECK_FUNCS([select])
+AC_CHECK_FUNCS([setlocale])
 AC_CHECK_FUNCS([socket])
 AC_CHECK_FUNCS([strchr])
 AC_CHECK_FUNCS([strdup])
@@ -631,16 +690,19 @@ AC_CONFIG_FILES([
   lib/cpp/thrift-nb.pc
   lib/cpp/thrift-z.pc
   lib/cpp/thrift-qt.pc
+  lib/cpp/thrift-qt5.pc
   lib/cpp/thrift.pc
   lib/c_glib/Makefile
   lib/c_glib/thrift_c_glib.pc
   lib/c_glib/test/Makefile
   lib/csharp/Makefile
+  lib/csharp/test/ThriftTest/Makefile
   lib/d/Makefile
   lib/d/test/Makefile
   lib/erl/Makefile
   lib/go/Makefile
   lib/go/test/Makefile
+  lib/haxe/test/Makefile
   lib/hs/Makefile
   lib/java/Makefile
   lib/js/test/Makefile
@@ -653,9 +715,11 @@ AC_CONFIG_FILES([
   lib/rb/Makefile
   lib/lua/Makefile
   test/Makefile
+  test/c_glib/Makefile
   test/cpp/Makefile
   test/erl/Makefile
   test/go/Makefile
+  test/haxe/Makefile
   test/hs/Makefile
   test/php/Makefile
   test/perl/Makefile
@@ -667,6 +731,7 @@ AC_CONFIG_FILES([
   tutorial/c_glib/Makefile
   tutorial/cpp/Makefile
   tutorial/go/Makefile
+  tutorial/haxe/Makefile
   tutorial/hs/Makefile
   tutorial/java/Makefile
   tutorial/js/Makefile
@@ -689,6 +754,7 @@ echo "Building Java Library ........ : $have_java"
 echo "Building C# Library .......... : $have_csharp"
 echo "Building Python Library ...... : $have_python"
 echo "Building Ruby Library ........ : $have_ruby"
+echo "Building Haxe Library ........ : $have_haxe"
 echo "Building Haskell Library ..... : $have_haskell"
 echo "Building Perl Library ........ : $have_perl"
 echo "Building PHP Library ......... : $have_php"
@@ -703,7 +769,8 @@ if test "$have_cpp" = "yes" ; then
   echo "C++ Library:"
   echo "   Build TZlibTransport ...... : $have_zlib"
   echo "   Build TNonblockingServer .. : $have_libevent"
-  echo "   Build TQTcpServer (Qt) .... : $have_qt"
+  echo "   Build TQTcpServer (Qt4) .... : $have_qt"
+  echo "   Build TQTcpServer (Qt5) .... : $have_qt5"
 fi
 if test "$have_java" = "yes" ; then
   echo
@@ -721,6 +788,7 @@ if test "$have_python" = "yes" ; then
   echo
   echo "Python Library:"
   echo "   Using Python .............. : $PYTHON"
+  echo "   Using Trial ............... : $TRIAL"
 fi
 if test "$have_php" = "yes" ; then
   echo
@@ -737,6 +805,12 @@ if test "$have_haskell" = "yes" ; then
   echo "Haskell Library:"
   echo "   Using Haskell ............. : $RUNHASKELL"
   echo "   Using Cabal ............... : $CABAL"
+fi
+if test "$have_haxe" = "yes" ; then
+  echo
+  echo "Haxe Library:"
+  echo "   Using Haxe ................ : $HAXE"
+  echo "   Using Haxe version ........ : $HAXE_VERSION"
 fi
 if test "$have_perl" = "yes" ; then
   echo

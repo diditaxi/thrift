@@ -18,169 +18,195 @@
  */
 
 using System;
+using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 
 namespace Thrift.Transport
 {
-	/// <summary>
-	/// SSL Server Socket Wrapper Class
-	/// </summary>
-	public class TTLSServerSocket : TServerTransport
-	{
-		/// <summary>
-		/// Underlying tcp server
-		/// </summary>
-		private TcpListener server = null;
+    /// <summary>
+    /// SSL Server Socket Wrapper Class
+    /// </summary>
+    public class TTLSServerSocket : TServerTransport
+    {
+        /// <summary>
+        /// Underlying tcp server
+        /// </summary>
+        private TcpListener server = null;
 
-		/// <summary>
-		/// The port where the socket listen
-		/// </summary>
-		private int port = 0;
+        /// <summary>
+        /// The port where the socket listen
+        /// </summary>
+        private int port = 0;
 
-		/// <summary>
-		/// Timeout for the created server socket
-		/// </summary>
-		private int clientTimeout = 0;
+        /// <summary>
+        /// Timeout for the created server socket
+        /// </summary>
+        private int clientTimeout = 0;
 
-		/// <summary>
-		/// Whether or not to wrap new TSocket connections in buffers
-		/// </summary>
-		private bool useBufferedSockets = false;
+        /// <summary>
+        /// Whether or not to wrap new TSocket connections in buffers
+        /// </summary>
+        private bool useBufferedSockets = false;
 
-		/// <summary>
-		/// The servercertificate with the private- and public-key
-		/// </summary>
-		private X509Certificate serverCertificate;
+        /// <summary>
+        /// The servercertificate with the private- and public-key
+        /// </summary>
+        private X509Certificate serverCertificate;
 
+        /// <summary>
+        /// The function to validate the client certificate.
+        /// </summary>
+        private RemoteCertificateValidationCallback clientCertValidator;
 
-		/// <summary>
-		/// Initializes a new instance of the <see cref="TTLSServerSocket" /> class.
-		/// </summary>
-		/// <param name="port">The port where the server runs.</param>
-		/// <param name="certificate">The certificate object.</param>
-		public TTLSServerSocket(int port, X509Certificate2 certificate)
-			: this(port,  0, certificate)
-		{
-		}
+        /// <summary>
+        /// The function to determine which certificate to use.
+        /// </summary>
+        private LocalCertificateSelectionCallback localCertificateSelectionCallback;
 
-		/// <summary>
-		/// Initializes a new instance of the <see cref="TTLSServerSocket" /> class.
-		/// </summary>
-		/// <param name="port">The port where the server runs.</param>
-		/// <param name="clientTimeout">Send/receive timeout.</param>
-		/// <param name="certificate">The certificate object.</param>
-		public TTLSServerSocket(int port, int clientTimeout, X509Certificate2 certificate)
-			: this(port, clientTimeout, false, certificate)
-		{
-		}
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TTLSServerSocket" /> class.
+        /// </summary>
+        /// <param name="port">The port where the server runs.</param>
+        /// <param name="certificate">The certificate object.</param>
+        public TTLSServerSocket(int port, X509Certificate2 certificate)
+            : this(port,  0, certificate)
+        {
+        }
 
-		/// <summary>
-		/// Initializes a new instance of the <see cref="TTLSServerSocket" /> class.
-		/// </summary>
-		/// <param name="port">The port where the server runs.</param>
-		/// <param name="clientTimeout">Send/receive timeout.</param>
-		/// <param name="useBufferedSockets">If set to <c>true</c> [use buffered sockets].</param>
-		/// <param name="certificate">The certificate object.</param>
-		public TTLSServerSocket(int port, int clientTimeout, bool useBufferedSockets, X509Certificate2 certificate)
-		{
-			if (!certificate.HasPrivateKey)
-			{
-				throw new TTransportException(TTransportException.ExceptionType.Unknown, "Your server-certificate needs to have a private key");
-			}
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TTLSServerSocket" /> class.
+        /// </summary>
+        /// <param name="port">The port where the server runs.</param>
+        /// <param name="clientTimeout">Send/receive timeout.</param>
+        /// <param name="certificate">The certificate object.</param>
+        public TTLSServerSocket(int port, int clientTimeout, X509Certificate2 certificate)
+            : this(port, clientTimeout, false, certificate)
+        {
+        }
 
-			this.port = port;
-			this.serverCertificate = certificate;
-			this.useBufferedSockets = useBufferedSockets;
-			try
-			{
-				// Create server socket
-				server = new TcpListener(System.Net.IPAddress.Any, this.port);
-				server.Server.NoDelay = true;
-			}
-			catch (Exception)
-			{
-				server = null;
-				throw new TTransportException("Could not create ServerSocket on port " + port + ".");
-			}
-		}
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TTLSServerSocket" /> class.
+        /// </summary>
+        /// <param name="port">The port where the server runs.</param>
+        /// <param name="clientTimeout">Send/receive timeout.</param>
+        /// <param name="useBufferedSockets">If set to <c>true</c> [use buffered sockets].</param>
+        /// <param name="certificate">The certificate object.</param>
+        /// <param name="clientCertValidator">The certificate validator.</param>
+        /// <param name="localCertificateSelectionCallback">The callback to select which certificate to use.</param>
+        public TTLSServerSocket(
+            int port,
+            int clientTimeout,
+            bool useBufferedSockets,
+            X509Certificate2 certificate,
+            RemoteCertificateValidationCallback clientCertValidator = null,
+            LocalCertificateSelectionCallback localCertificateSelectionCallback = null)
+        {
+            if (!certificate.HasPrivateKey)
+            {
+                throw new TTransportException(TTransportException.ExceptionType.Unknown, "Your server-certificate needs to have a private key");
+            }
 
-		/// <summary>
-		/// Starts the server.
-		/// </summary>
-		public override void Listen()
-		{
-			// Make sure accept is not blocking
-			if (this.server != null)
-			{
-				try
-				{
-					this.server.Start();
-				}
-				catch (SocketException sx)
-				{
-					throw new TTransportException("Could not accept on listening socket: " + sx.Message);
-				}
-			}
-		}
+            this.port = port;
+            this.serverCertificate = certificate;
+            this.useBufferedSockets = useBufferedSockets;
+            this.clientCertValidator = clientCertValidator;
+            this.localCertificateSelectionCallback = localCertificateSelectionCallback;
+            try
+            {
+                // Create server socket
+                this.server = TSocketVersionizer.CreateTcpListener(port);
+                this.server.Server.NoDelay = true;
+            }
+            catch (Exception)
+            {
+                server = null;
+                throw new TTransportException("Could not create ServerSocket on port " + port + ".");
+            }
+        }
 
-		/// <summary>
-		/// Callback for Accept Implementation
-		/// </summary>
-		/// <returns>
-		/// TTransport-object.
-		/// </returns>
-		protected override TTransport AcceptImpl()
-		{
-			if (this.server == null)
-			{
-				throw new TTransportException(TTransportException.ExceptionType.NotOpen, "No underlying server socket.");
-			}
+        /// <summary>
+        /// Starts the server.
+        /// </summary>
+        public override void Listen()
+        {
+            // Make sure accept is not blocking
+            if (this.server != null)
+            {
+                try
+                {
+                    this.server.Start();
+                }
+                catch (SocketException sx)
+                {
+                    throw new TTransportException("Could not accept on listening socket: " + sx.Message);
+                }
+            }
+        }
 
-			try
-			{
-				TcpClient client = this.server.AcceptTcpClient();
-				client.SendTimeout = client.ReceiveTimeout = this.clientTimeout;
+        /// <summary>
+        /// Callback for Accept Implementation
+        /// </summary>
+        /// <returns>
+        /// TTransport-object.
+        /// </returns>
+        protected override TTransport AcceptImpl()
+        {
+            if (this.server == null)
+            {
+                throw new TTransportException(TTransportException.ExceptionType.NotOpen, "No underlying server socket.");
+            }
 
-				//wrap the client in an SSL Socket passing in the SSL cert
-				TTLSSocket socket = new TTLSSocket(client, this.serverCertificate, true);
+            try
+            {
+                TcpClient client = this.server.AcceptTcpClient();
+                client.SendTimeout = client.ReceiveTimeout = this.clientTimeout;
 
-				socket.setupTLS();
+                //wrap the client in an SSL Socket passing in the SSL cert
+                TTLSSocket socket = new TTLSSocket(
+                    client,
+                    this.serverCertificate,
+                    true,
+                    this.clientCertValidator,
+                    this.localCertificateSelectionCallback
+                );
 
-				if (useBufferedSockets)
-				{
-					TBufferedTransport trans = new TBufferedTransport(socket);
-					return trans;
-				}
-				else
-				{
-					return socket;
-				}
-				
-			}
-			catch (Exception ex)
-			{
-				throw new TTransportException(ex.ToString());
-			}
-		}
+                socket.setupTLS();
 
-		/// <summary>
-		/// Stops the Server
-		/// </summary>
-		public override void Close()
-		{
-			if (this.server != null)
-			{
-				try
-				{
-					this.server.Stop();
-				}
-				catch (Exception ex)  
-				{
-					throw new TTransportException("WARNING: Could not close server socket: " + ex);
-				}
-				this.server = null;
-			}
-		}
-	}
+                if (useBufferedSockets)
+                {
+                    TBufferedTransport trans = new TBufferedTransport(socket);
+                    return trans;
+                }
+                else
+                {
+                    return socket;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                throw new TTransportException(ex.ToString());
+            }
+        }
+
+        /// <summary>
+        /// Stops the Server
+        /// </summary>
+        public override void Close()
+        {
+            if (this.server != null)
+            {
+                try
+                {
+                    this.server.Stop();
+                }
+                catch (Exception ex)
+                {
+                    throw new TTransportException("WARNING: Could not close server socket: " + ex);
+                }
+                this.server = null;
+            }
+        }
+    }
 }

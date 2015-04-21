@@ -118,11 +118,7 @@ namespace Thrift.Server
         }
         catch (TTransportException ttx)
         {
-          if (stop)
-          {
-            logDelegate("TThreadPoolServer was shutting down, caught " + ttx.GetType().Name);
-          }
-          else
+          if (!stop || ttx.Type != TTransportException.ExceptionType.Interrupted)
           {
             ++failureCount;
             logDelegate(ttx.ToString());
@@ -170,8 +166,11 @@ namespace Thrift.Server
           connectionContext = serverEventHandler.createContext(inputProtocol, outputProtocol);
 
         //Process client requests until client disconnects
-        while (true)
+        while (!stop)
         {
+          if (!inputTransport.Peek())
+            break;
+
           //Fire processContext server event
           //N.B. This is the pattern implemented in C++ and the event fires provisionally.
           //That is to say it may be many minutes between the event firing and the client request

@@ -37,9 +37,49 @@ dist-hook:
 print-version:
 	@echo $(VERSION)
 
+.PHONY: precross cross
+precross-%: all
+	$(MAKE) -C $* precross
+precross: all precross-test precross-lib
 
-cross: check
-	sh test/test.sh
+# TODO: generate --server and --client switches from "--with(out)-..." build flags
+cross: precross
+	$(PYTHON) test/test.py -s
+
+TIMES = 1 2 3
+fail: precross
+	$(PYTHON) test/test.py || true
+	$(PYTHON) test/test.py --update-expected-failures=overwrite
+	$(foreach var,$(TIMES),test/test.py -s || true;test/test.py --update-expected-failures=merge;)
+
+codespell_skip_files = \
+	*.jar \
+	*.class \
+	*.so \
+	*.a \
+	*.la \
+	*.o \
+	*.p12 \
+	*OCamlMakefile \
+	.keystore \
+	.truststore \
+	CHANGES \
+	config.sub \
+	configure \
+	depcomp \
+	libtool.m4 \
+	output.* \
+	rebar \
+	thrift
+
+empty :=
+space := $(empty) $(empty)
+comma := ,
+
+skipped_files = $(subst $(space),$(comma),$(codespell_skip_files))
+
+style-local:
+	codespell --write-changes --skip=$(skipped_files) --disable-colors
 
 EXTRA_DIST = \
 	.travis.yml \
@@ -49,6 +89,7 @@ EXTRA_DIST = \
 	debian \
 	doc \
 	doap.rdf \
+	package.json \
 	sonar-project.properties \
 	LICENSE \
 	CHANGES \

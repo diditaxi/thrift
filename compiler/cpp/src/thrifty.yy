@@ -53,6 +53,13 @@
  * assigned starting from -1 and working their way down.
  */
 int y_field_val = -1;
+/**
+ * This global variable is used for automatic numbering of enum values.
+ * y_enum_val is the last value assigned; the next auto-assigned value will be
+ * y_enum_val+1, and then it continues working upwards.  Explicitly specified
+ * enum values reset y_enum_val to that value.
+ */
+int32_t y_enum_val = -1;
 int g_arglist = 0;
 const int struct_is_struct = 0;
 const int struct_is_union = 1;
@@ -200,6 +207,7 @@ const int struct_is_union = 1;
 %type<tenum>     Enum
 %type<tenum>     EnumDefList
 %type<tenumv>    EnumDef
+%type<tenumv>    EnumValue
 
 %type<ttypedef>  Senum
 %type<tbase>     SenumDefList
@@ -292,7 +300,7 @@ Header:
 | tok_namespace tok_identifier tok_identifier
     {
       pdebug("Header -> tok_namespace tok_identifier tok_identifier");
-      declare_valid_program_doctext();  
+      declare_valid_program_doctext();
       if (g_parse_mode == PROGRAM) {
         g_program->set_namespace($2, $3);
       }
@@ -300,7 +308,7 @@ Header:
 | tok_namespace '*' tok_identifier
     {
       pdebug("Header -> tok_namespace * tok_identifier");
-      declare_valid_program_doctext();  
+      declare_valid_program_doctext();
       if (g_parse_mode == PROGRAM) {
         g_program->set_namespace("*", $3);
       }
@@ -310,7 +318,7 @@ Header:
     {
       pwarning(1, "'cpp_namespace' is deprecated. Use 'namespace cpp' instead");
       pdebug("Header -> tok_cpp_namespace tok_identifier");
-      declare_valid_program_doctext();  
+      declare_valid_program_doctext();
       if (g_parse_mode == PROGRAM) {
         g_program->set_namespace("cpp", $2);
       }
@@ -318,7 +326,7 @@ Header:
 | tok_cpp_include tok_literal
     {
       pdebug("Header -> tok_cpp_include tok_literal");
-      declare_valid_program_doctext();  
+      declare_valid_program_doctext();
       if (g_parse_mode == PROGRAM) {
         g_program->add_cpp_include($2);
       }
@@ -327,7 +335,7 @@ Header:
     {
       pwarning(1, "'php_namespace' is deprecated. Use 'namespace php' instead");
       pdebug("Header -> tok_php_namespace tok_identifier");
-      declare_valid_program_doctext();  
+      declare_valid_program_doctext();
       if (g_parse_mode == PROGRAM) {
         g_program->set_namespace("php", $2);
       }
@@ -337,7 +345,7 @@ Header:
     {
       pwarning(1, "'py_module' is deprecated. Use 'namespace py' instead");
       pdebug("Header -> tok_py_module tok_identifier");
-      declare_valid_program_doctext();  
+      declare_valid_program_doctext();
       if (g_parse_mode == PROGRAM) {
         g_program->set_namespace("py", $2);
       }
@@ -347,7 +355,7 @@ Header:
     {
       pwarning(1, "'perl_package' is deprecated. Use 'namespace perl' instead");
       pdebug("Header -> tok_perl_namespace tok_identifier");
-      declare_valid_program_doctext();  
+      declare_valid_program_doctext();
       if (g_parse_mode == PROGRAM) {
         g_program->set_namespace("perl", $2);
       }
@@ -357,7 +365,7 @@ Header:
     {
       pwarning(1, "'ruby_namespace' is deprecated. Use 'namespace rb' instead");
       pdebug("Header -> tok_ruby_namespace tok_identifier");
-      declare_valid_program_doctext();  
+      declare_valid_program_doctext();
       if (g_parse_mode == PROGRAM) {
         g_program->set_namespace("rb", $2);
       }
@@ -367,7 +375,7 @@ Header:
     {
       pwarning(1, "'smalltalk_category' is deprecated. Use 'namespace smalltalk.category' instead");
       pdebug("Header -> tok_smalltalk_category tok_st_identifier");
-      declare_valid_program_doctext();  
+      declare_valid_program_doctext();
       if (g_parse_mode == PROGRAM) {
         g_program->set_namespace("smalltalk.category", $2);
       }
@@ -377,7 +385,7 @@ Header:
     {
       pwarning(1, "'smalltalk_prefix' is deprecated. Use 'namespace smalltalk.prefix' instead");
       pdebug("Header -> tok_smalltalk_prefix tok_identifier");
-      declare_valid_program_doctext();  
+      declare_valid_program_doctext();
       if (g_parse_mode == PROGRAM) {
         g_program->set_namespace("smalltalk.prefix", $2);
       }
@@ -387,7 +395,7 @@ Header:
     {
       pwarning(1, "'java_package' is deprecated. Use 'namespace java' instead");
       pdebug("Header -> tok_java_package tok_identifier");
-      declare_valid_program_doctext();  
+      declare_valid_program_doctext();
       if (g_parse_mode == PROGRAM) {
         g_program->set_namespace("java", $2);
       }
@@ -397,7 +405,7 @@ Header:
     {
       pwarning(1, "'cocoa_prefix' is deprecated. Use 'namespace cocoa' instead");
       pdebug("Header -> tok_cocoa_prefix tok_identifier");
-      declare_valid_program_doctext();  
+      declare_valid_program_doctext();
       if (g_parse_mode == PROGRAM) {
         g_program->set_namespace("cocoa", $2);
       }
@@ -407,7 +415,7 @@ Header:
     {
       pwarning(1, "'xsd_namespace' is deprecated. Use 'namespace xsd' instead");
       pdebug("Header -> tok_xsd_namespace tok_literal");
-      declare_valid_program_doctext();  
+      declare_valid_program_doctext();
       if (g_parse_mode == PROGRAM) {
         g_program->set_namespace("cocoa", $2);
       }
@@ -417,7 +425,7 @@ Header:
    {
      pwarning(1, "'csharp_namespace' is deprecated. Use 'namespace csharp' instead");
      pdebug("Header -> tok_csharp_namespace tok_identifier");
-     declare_valid_program_doctext();  
+     declare_valid_program_doctext();
      if (g_parse_mode == PROGRAM) {
        g_program->set_namespace("csharp", $2);
      }
@@ -427,7 +435,7 @@ Header:
    {
      pwarning(1, "'delphi_namespace' is deprecated. Use 'namespace delphi' instead");
      pdebug("Header -> tok_delphi_namespace tok_identifier");
-     declare_valid_program_doctext();  
+     declare_valid_program_doctext();
      if (g_parse_mode == PROGRAM) {
        g_program->set_namespace("delphi", $2);
      }
@@ -437,7 +445,7 @@ Include:
   tok_include tok_literal
     {
       pdebug("Include -> tok_include tok_literal");
-      declare_valid_program_doctext();  
+      declare_valid_program_doctext();
       if (g_parse_mode == INCLUDES) {
         std::string path = include_file(std::string($2));
         if (!path.empty()) {
@@ -537,8 +545,16 @@ TypeDefinition:
       }
     }
 
+CommaOrSemicolonOptional:
+  ','
+    {}
+| ';'
+    {}
+|
+    {}
+
 Typedef:
-  tok_typedef FieldType tok_identifier TypeAnnotations
+  tok_typedef FieldType tok_identifier TypeAnnotations CommaOrSemicolonOptional
     {
       pdebug("TypeDef -> tok_typedef FieldType tok_identifier");
       validate_simple_identifier( $3);
@@ -549,14 +565,6 @@ Typedef:
         delete $4;
       }
     }
-
-CommaOrSemicolonOptional:
-  ','
-    {}
-| ';'
-    {}
-|
-    {}
 
 Enum:
   tok_enum tok_identifier '{' EnumDefList '}' TypeAnnotations
@@ -569,7 +577,7 @@ Enum:
         $$->annotations_ = $6->annotations_;
         delete $6;
       }
-      $$->resolve_values();
+
       // make constants for all the enum values
       if (g_parse_mode == PROGRAM) {
         const std::vector<t_enum_value*>& enum_values = $$->get_constants();
@@ -597,41 +605,48 @@ EnumDefList:
     {
       pdebug("EnumDefList -> ");
       $$ = new t_enum(g_program);
+      y_enum_val = -1;
     }
 
 EnumDef:
-  CaptureDocText tok_identifier '=' tok_int_constant TypeAnnotations CommaOrSemicolonOptional
+  CaptureDocText EnumValue TypeAnnotations CommaOrSemicolonOptional
     {
-      pdebug("EnumDef -> tok_identifier = tok_int_constant");
-      if ($4 < 0) {
-        pwarning(1, "Negative value supplied for enum %s.\n", $2);
-      }
-      if ($4 > INT_MAX) {
-        pwarning(1, "64-bit value supplied for enum %s.\n", $2);
-      }
-      validate_simple_identifier( $2);
-      $$ = new t_enum_value($2, static_cast<int>($4));
+      pdebug("EnumDef -> EnumValue");
+      $$ = $2;
       if ($1 != NULL) {
         $$->set_doc($1);
       }
-      if ($5 != NULL) {
-        $$->annotations_ = $5->annotations_;
-        delete $5;
-      }
-    }
-|
-  CaptureDocText tok_identifier TypeAnnotations CommaOrSemicolonOptional
-    {
-      pdebug("EnumDef -> tok_identifier");
-      validate_simple_identifier( $2);
-      $$ = new t_enum_value($2);
-      if ($1 != NULL) {
-        $$->set_doc($1);
-      }
-      if ($3 != NULL) {
+	  if ($3 != NULL) {
         $$->annotations_ = $3->annotations_;
         delete $3;
       }
+    }
+
+EnumValue:
+  tok_identifier '=' tok_int_constant
+    {
+      pdebug("EnumValue -> tok_identifier = tok_int_constant");
+      if ($3 < INT32_MIN || $3 > INT32_MAX) {
+        // Note: this used to be just a warning.  However, since thrift always
+        // treats enums as i32 values, I'm changing it to a fatal error.
+        // I doubt this will affect many people, but users who run into this
+        // will have to update their thrift files to manually specify the
+        // truncated i32 value that thrift has always been using anyway.
+        failure("64-bit value supplied for enum %s will be truncated.", $1);
+      }
+      y_enum_val = static_cast<int32_t>($3);
+      $$ = new t_enum_value($1, y_enum_val);
+    }
+ |
+  tok_identifier
+    {
+      pdebug("EnumValue -> tok_identifier");
+      validate_simple_identifier( $1);
+      if (y_enum_val == INT32_MAX) {
+        failure("enum value overflow at enum %s", $1);
+      }
+      ++y_enum_val;
+      $$ = new t_enum_value($1, y_enum_val);
     }
 
 Senum:

@@ -49,6 +49,14 @@ thrift_framed_transport_is_open (ThriftTransport *transport)
   return THRIFT_TRANSPORT_GET_CLASS (t->transport)->is_open (t->transport);
 }
 
+/* overrides thrift_transport_peek */
+gboolean
+thrift_framed_transport_peek (ThriftTransport *transport, GError **error)
+{
+  ThriftFramedTransport *t = THRIFT_FRAMED_TRANSPORT (transport);
+  return (t->r_buf->len > 0) || thrift_transport_peek (t->transport, error);
+}
+
 /* implements thrift_transport_open */
 gboolean
 thrift_framed_transport_open (ThriftTransport *transport, GError **error)
@@ -71,25 +79,32 @@ thrift_framed_transport_read_frame (ThriftTransport *transport,
                                     GError **error)
 {
   ThriftFramedTransport *t = THRIFT_FRAMED_TRANSPORT (transport);
-  gint32 sz, bytes;
+  guint32 sz;
+  gint32 bytes;
+  gboolean result = FALSE;
 
   /* read the size */
-  THRIFT_TRANSPORT_GET_CLASS (t->transport)->read (t->transport,
-                                                   (guint32 *) &sz,
-                                                   sizeof (sz), error);
-  sz = ntohl (sz);
+  if (thrift_transport_read (t->transport,
+                             &sz,
+                             sizeof (sz),
+                             error) == sizeof (sz))
+  {
+    sz = ntohl (sz);
 
-  /* create a buffer to hold the data and read that much data */
-  guchar tmpdata[sz];
-  bytes = THRIFT_TRANSPORT_GET_CLASS (t->transport)->read (t->transport,
-                                                           tmpdata,
-                                                           sz,
-                                                           error);
+    /* create a buffer to hold the data and read that much data */
+    guchar tmpdata[sz];
+    bytes = thrift_transport_read (t->transport, tmpdata, sz, error);
 
-  /* add the data to the buffer */
-  g_byte_array_append (t->r_buf, tmpdata, bytes);
+    if (bytes > 0 && (error == NULL || *error == NULL))
+    {
+      /* add the data to the buffer */
+      g_byte_array_append (t->r_buf, tmpdata, bytes);
 
-  return TRUE;
+      result = TRUE;
+    }
+  }
+
+  return result;
 }
 
 /* the actual read is "slow" because it calls the underlying transport */
@@ -100,6 +115,7 @@ thrift_framed_transport_read_slow (ThriftTransport *transport, gpointer buf,
   ThriftFramedTransport *t = THRIFT_FRAMED_TRANSPORT (transport);
   guint32 want = len;
   guint32 have = t->r_buf->len;
+  gint32 result = -1;
 
   // we shouldn't hit this unless the buffer doesn't have enough to read
   assert (t->r_buf->len < want);
@@ -113,17 +129,20 @@ thrift_framed_transport_read_slow (ThriftTransport *transport, gpointer buf,
   }
 
   // read a frame of input and buffer it
-  thrift_framed_transport_read_frame (transport, error);
+  if (thrift_framed_transport_read_frame (transport, error) == TRUE)
+  {
+    // hand over what we have up to what the caller wants
+    guint32 give = want < t->r_buf->len ? want : t->r_buf->len;
 
-  // hand over what we have up to what the caller wants
-  guint32 give = want < t->r_buf->len ? want : t->r_buf->len;
+    // copy the data into the buffer
+    memcpy (buf + len - want, t->r_buf->data, give);
+    t->r_buf = g_byte_array_remove_range (t->r_buf, 0, give);
+    want -= give;
 
-  // copy the data into the buffer
-  memcpy (buf + len - want, t->r_buf->data, give);
-  t->r_buf = g_byte_array_remove_range (t->r_buf, 0, give);
-  want -= give;
+    result = len - want;
+  }
 
-  return (len - want);
+  return result;
 }
 
 /* implements thrift_transport_read */
@@ -350,6 +369,7 @@ thrift_framed_transport_class_init (ThriftFramedTransportClass *cls)
 
   gobject_class->finalize = thrift_framed_transport_finalize;
   ttc->is_open = thrift_framed_transport_is_open;
+  ttc->peek = thrift_framed_transport_peek;
   ttc->open = thrift_framed_transport_open;
   ttc->close = thrift_framed_transport_close;
   ttc->read = thrift_framed_transport_read;

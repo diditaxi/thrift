@@ -20,10 +20,8 @@ Now open the folder build_ec using eclipse.
 ### Cross compile using mingw32 and generate a Windows Installer with CPack
 
     mkdir build_mingw32 && cd build_mingw32
-    cmake -DCMAKE_TOOLCHAIN_FILE=../../../contrib/mingw32-toolchain.cmake -DTHRIFT_COMPILER_HS=OFF ..
+    cmake -DCMAKE_TOOLCHAIN_FILE=../../../contrib/mingw32-toolchain.cmake ..
     cpack
-
-Haskell uses C++ features not supported by mingw32 such as auto or nullptr, that's why we disable it.
 
 ## Build on windows
 
@@ -32,8 +30,8 @@ In order to build on windows a few additional steps are necessary:
 1. Download winflexbison from http://sourceforge.net/projects/winflexbison/
 2. Extract the winflex bison files to for e.g. C:\winflexbison
 3. Make the CMake variables point to the correct binaries.
-  * FLEX_EXECUTBALE = C:/winbuild/win_flex.exe
-  * BISON_EXECUTBALE = C:/winbuild/win_bison.exe
+  * FLEX_EXECUTABLE = C:/winbuild/win_flex.exe
+  * BISON_EXECUTABLE = C:/winbuild/win_bison.exe
 
 
 ### Create a Visual Studio project

@@ -19,6 +19,10 @@
 
 SUBDIRS =
 
+if WITH_C_GLIB
+SUBDIRS += c_glib
+endif
+
 if WITH_CPP
 SUBDIRS += cpp
 endif
@@ -45,6 +49,10 @@ if WITH_HASKELL
 SUBDIRS += hs
 endif
 
+if WITH_HAXE
+SUBDIRS += haxe
+endif
+
 if WITH_GO
 SUBDIRS += go
 endif
@@ -61,9 +69,9 @@ check-local:
 
 EXTRA_DIST = \
 	keys \
-	test.sh \
 	test.py \
 	tests.json \
+	c_glib \
 	cpp \
 	erl \
 	hs \
@@ -95,3 +103,7 @@ EXTRA_DIST = \
 	ThriftTest.thrift \
 	FastbinaryTest.py \
 	README.md
+
+precross-%:
+	$(MAKE) -C $* precross
+precross: precross-py precross-rb precross-c_glib precross-cpp precross-perl precross-php precross-go

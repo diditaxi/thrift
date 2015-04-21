@@ -28,21 +28,14 @@
  *
  */
 class t_enum : public t_type {
- public:
-  t_enum(t_program* program) :
-    t_type(program) {}
+public:
+  t_enum(t_program* program) : t_type(program) {}
 
-  void set_name(const std::string& name) {
-    name_ = name;
-  }
+  void set_name(const std::string& name) { name_ = name; }
 
-  void append(t_enum_value* constant) {
-    constants_.push_back(constant);
-  }
+  void append(t_enum_value* constant) { constants_.push_back(constant); }
 
-  const std::vector<t_enum_value*>& get_constants() {
-    return constants_;
-  }
+  const std::vector<t_enum_value*>& get_constants() { return constants_; }
 
   t_enum_value* get_constant_by_name(const std::string name) {
     const std::vector<t_enum_value*>& enum_values = get_constants();
@@ -72,14 +65,12 @@ class t_enum : public t_type {
     t_enum_value* min_value;
     if (enum_values.size() == 0) {
       min_value = NULL;
-    }
-    else {
+    } else {
       int min_value_value;
       min_value = enum_values.front();
-      min_value_value = (min_value->has_value() ? min_value->get_value() : 1);
+      min_value_value = min_value->get_value();
       for (c_iter = enum_values.begin(); c_iter != enum_values.end(); ++c_iter) {
-        if ((*c_iter)->has_value() &&
-            ((*c_iter)->get_value() < min_value_value)) {
+        if ((*c_iter)->get_value() < min_value_value) {
           min_value = (*c_iter);
           min_value_value = min_value->get_value();
         }
@@ -94,15 +85,12 @@ class t_enum : public t_type {
     t_enum_value* max_value;
     if (enum_values.size() == 0) {
       max_value = NULL;
-    }
-    else {
+    } else {
       int max_value_value;
       max_value = enum_values.back();
-      max_value_value =
-        (max_value->has_value() ? max_value->get_value() : enum_values.size());
+      max_value_value = max_value->get_value();
       for (c_iter = enum_values.begin(); c_iter != enum_values.end(); ++c_iter) {
-        if ((*c_iter)->has_value() &&
-            ((*c_iter)->get_value() > max_value_value)) {
+        if ((*c_iter)->get_value() > max_value_value) {
           max_value = (*c_iter);
           max_value_value = max_value->get_value();
         }
@@ -111,28 +99,11 @@ class t_enum : public t_type {
     return max_value;
   }
 
-  bool is_enum() const {
-    return true;
-  }
+  bool is_enum() const { return true; }
 
-  virtual std::string get_fingerprint_material() const {
-    return "enum";
-  }
+  virtual std::string get_fingerprint_material() const { return "enum"; }
 
-  void resolve_values() {
-    const std::vector<t_enum_value*>& enum_values = get_constants();
-    std::vector<t_enum_value*>::const_iterator c_iter;
-    int lastValue = -1;
-    for (c_iter = enum_values.begin(); c_iter != enum_values.end(); ++c_iter) {
-      if (! (*c_iter)->has_value()) {
-        (*c_iter)->set_value(++lastValue);
-      } else {
-        lastValue = (*c_iter)->get_value();
-      }
-    }
-  }
-
- private:
+private:
   std::vector<t_enum_value*> constants_;
 };
 

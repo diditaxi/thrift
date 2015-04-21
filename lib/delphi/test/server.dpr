@@ -31,9 +31,11 @@ uses
   Thrift.Transport.Pipes in '..\src\Thrift.Transport.Pipes.pas',
   Thrift.Protocol in '..\src\Thrift.Protocol.pas',
   Thrift.Protocol.JSON in '..\src\Thrift.Protocol.JSON.pas',
+  Thrift.Protocol.Compact in '..\src\Thrift.Protocol.Compact.pas',
   Thrift.Collections in '..\src\Thrift.Collections.pas',
   Thrift.Server in '..\src\Thrift.Server.pas',
   Thrift.Console in '..\src\Thrift.Console.pas',
+  Thrift.TypeRegistry in '..\src\Thrift.TypeRegistry.pas',
   Thrift.Utils in '..\src\Thrift.Utils.pas',
   Thrift.Stream in '..\src\Thrift.Stream.pas';
 
@@ -55,10 +57,14 @@ begin
       args[i-1] := arg;
     end;
     TTestServer.Execute( args );
-    Writeln('Press ENTER to close ... '); Readln;
   except
-    on E: Exception do
+    on E: EAbort do begin
+      ExitCode := $FF;
+    end;
+    on E: Exception do begin
       Writeln(E.ClassName, ': ', E.Message);
+      ExitCode := $FF;
+    end;
   end;
 end.
 

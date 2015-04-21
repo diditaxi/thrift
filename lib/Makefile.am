@@ -85,8 +85,13 @@ EXTRA_DIST = \
 	cocoa \
 	d \
 	delphi \
+	haxe \
 	javame \
 	js \
 	ocaml \
 	st \
 	ts
+
+precross-%:
+	$(MAKE) -C $* precross
+precross: precross-nodejs precross-csharp precross-java

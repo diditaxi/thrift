@@ -30,41 +30,19 @@
  *
  */
 class t_enum_value : public t_doc {
- public:
-  t_enum_value(std::string name) :
-    name_(name),
-    has_value_(false),
-    value_(0) {}
-
-  t_enum_value(std::string name, int value) :
-    name_(name),
-    has_value_(true),
-    value_(value) {}
+public:
+  t_enum_value(std::string name, int value) : name_(name), value_(value) {}
 
   ~t_enum_value() {}
 
-  const std::string& get_name() {
-    return name_;
-  }
+  const std::string& get_name() const { return name_; }
 
-  bool has_value() {
-    return has_value_;
-  }
-
-  int get_value() {
-    return value_;
-  }
-
-  void set_value(int val) {
-    has_value_ = true;
-    value_ = val;
-  }
+  int get_value() const { return value_; }
 
   std::map<std::string, std::string> annotations_;
 
- private:
+private:
   std::string name_;
-  bool has_value_;
   int value_;
 };
 
